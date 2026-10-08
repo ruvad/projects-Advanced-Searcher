@@ -1,0 +1,9 @@
+{
+  "recommendations": [
+    "ms-vsliveshare.vsliveshare",
+    "ms-vscode.live-server",
+    "esbenp.prettier-vscode",
+    "ecmel.vscode-html-css",
+    "usernamehw.errorlens"
+  ]
+}

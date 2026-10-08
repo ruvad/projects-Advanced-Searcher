@@ -1,0 +1,8 @@
+# Secrets never go to GitHub
+.env
+*.key
+
+# System junk
+.DS_Store
+Thumbs.db
+node_modules/

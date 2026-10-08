@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Advanced Searcher</title>
+  <link rel="stylesheet" href="styles.css">
+  <!-- type="module" lets the JS files import from each other.
+       Modules need a server: use Live Preview, not a double-click on this file. -->
+  <script type="module" src="js/main.js"></script>
+</head>
+<body>
+  <header>
+    <h1>Advanced Searcher</h1>
+    <p id="status">JavaScript not loaded yet...</p>
+  </header>
+
+  <main>
+    <!-- 1. Preset cards (presets.js fills this in) -->
+    <section id="presets" aria-label="Presets"></section>
+
+    <!-- 2. The request -->
+    <form id="search-form">
+      <input id="query" type="text" placeholder="e.g. Frieren" required>
+      <button type="submit">Search</button>
+    </form>
+
+    <!-- 3. Prompt X-ray: shows the prompt our code built -->
+    <details id="xray">
+      <summary>Prompt X-ray</summary>
+      <pre id="xray-text"></pre>
+    </details>
+
+    <!-- 4. Results board (board.js fills this in) -->
+    <section id="board" aria-label="Results"></section>
+  </main>
+
+  <footer>
+    <!-- GamerPower's API terms ask for a link back to them -->
+    <p>Game giveaway data from <a href="https://www.gamerpower.com/">GamerPower.com</a></p>
+  </footer>
+</body>
+</html>

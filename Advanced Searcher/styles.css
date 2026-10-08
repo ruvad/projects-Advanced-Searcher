@@ -1,0 +1,33 @@
+/* Colours live here as variables, so the theme can change in one place. */
+:root {
+  --bg: #14161c;
+  --panel: #1e2129;
+  --text: #e8e8ec;
+  --muted: #9a9cab;
+  --accent: #7c9cff;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 16px;
+  font-family: system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+main {
+  max-width: 960px;
+  margin: 0 auto;
+  display: grid;
+  gap: 16px;
+}
+
+#status {
+  color: var(--muted);
+}
+
+/* TODO (style owner): preset cards, the form, the X-ray panel, the board columns */
