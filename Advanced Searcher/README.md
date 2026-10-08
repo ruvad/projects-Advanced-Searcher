@@ -6,10 +6,10 @@ An AI-powered search categorizer: pick a preset, type a request, and see results
 
 | File | Owner |
 | --- | --- |
-| `index.html`, `styles.css` | ________ |
-| `js/presets.js` (presets + prompt) | ________ |
-| `js/fetchers.js` (free APIs) | ________ |
-| `js/board.js` (results board) | ________ |
+| `index.html`, `styles.css` | Eric |
+| `js/presets.js` (presets + prompt) | ________ | - ask in Instagramm
+| `js/fetchers.js` (free APIs) | ________ | - ask in Instagramm
+| `js/board.js` (results board) | ________ | - ask in Instagramm
 
 ## Run it
 
