@@ -1,7 +1,5 @@
 # Web Guide: Everything You Need to Plan Advanced Searcher
 
-Written for the team leader (strong in Java, new to websites). Every code example here was **tested in Chrome on Oct 9, 2026**, and the results are quoted. Examples are *teaching pieces*, not the finished site: each one shows one idea in as few lines as possible.
-
 Contents:
 
 0. How a website works
