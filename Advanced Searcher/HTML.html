@@ -374,6 +374,142 @@
       line-height: 1.8;
     }
 
+    /* ----- Added for the JS base (Oct 11): restyle freely ----- */
+
+    .search-status {
+      min-height: 1em;
+      margin: 12px 0 0;
+      color: #a56b17;
+      font-size: 13px;
+    }
+
+    .ai-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 14px;
+      cursor: pointer;
+    }
+
+    .link-list {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      gap: 6px;
+      font-size: 13px;
+    }
+
+    .link-list a {
+      color: #243047;
+      text-decoration: none;
+      overflow-wrap: anywhere;
+    }
+
+    .link-list a:hover {
+      color: #5264db;
+    }
+
+    .link-list li {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .bookmark {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .bookmark img {
+      width: 18px;
+      height: 18px;
+      flex-shrink: 0;
+    }
+
+    .remove-button {
+      border: none;
+      background: none;
+      color: #758096;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    .add-button {
+      width: 100%;
+      margin-top: 12px;
+    }
+
+    .link-preview,
+    .preview-card {
+      padding: 16px;
+      border: 1px solid #e2e7f0;
+      border-radius: 15px;
+      background: white;
+      font-size: 13px;
+    }
+
+    .link-preview {
+      margin-top: 16px;
+    }
+
+    .link-preview img,
+    .preview-card img {
+      display: block;
+      max-width: 100%;
+      max-height: 140px;
+      margin-bottom: 10px;
+      border-radius: 8px;
+    }
+
+    .link-preview p,
+    .preview-card p {
+      color: #758096;
+      line-height: 1.6;
+    }
+
+    .preview-actions {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .preview-card {
+      position: fixed;
+      z-index: 10;
+      width: 280px;
+      box-shadow: 0 8px 24px rgb(36 48 71 / 15%);
+    }
+
+    #bookmark-dialog {
+      padding: 24px;
+      border: 1px solid #e2e7f0;
+      border-radius: 15px;
+    }
+
+    #bookmark-dialog input {
+      display: block;
+      width: 260px;
+      margin: 6px 0 14px;
+      padding: 10px;
+      border: 1px solid #dce2ef;
+      border-radius: 8px;
+      font: inherit;
+    }
+
+    .dialog-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    [hidden] {
+      display: none !important;
+    }
+
     @media (max-width: 1100px) {
       .page-layout {
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -448,7 +584,8 @@
         </svg>
         Recent views
       </h2>
-      <p class="sidebar-empty">No recently viewed resources.</p>
+      <p class="sidebar-empty" id="recent-empty">No recently viewed resources.</p>
+      <ul class="link-list" id="recent-list"></ul>
     </aside>
 
     <main>
@@ -497,7 +634,7 @@
               What would you like to learn?
             </label>
 
-            <div class="search-box">
+            <form class="search-box" id="text-form">
               <input
                 class="search-input"
                 id="text-search"
@@ -505,10 +642,10 @@
                 placeholder="Search for a topic or resource..."
                 aria-describedby="text-help"
               >
-              <button class="search-button" type="button" disabled>
+              <button class="search-button" type="submit">
                 Search
               </button>
-            </div>
+            </form>
 
             <p class="input-help" id="text-help">
               Try HTML, mathematics, or web design.
@@ -548,7 +685,9 @@
               Paste a resource link
             </label>
 
-            <div class="search-box">
+            <!-- novalidate: the browser would reject "anilist.co" without https://;
+                 our JS adds the https:// itself -->
+            <form class="search-box" id="link-form" novalidate>
               <input
                 class="search-input"
                 id="link-search"
@@ -556,33 +695,40 @@
                 placeholder="https://example.com/resource"
                 aria-describedby="link-help"
               >
-              <button class="search-button" type="button" disabled>
+              <button class="search-button" type="submit">
                 Search with link
               </button>
-            </div>
+            </form>
 
             <p class="input-help" id="link-help">
               Enter a website, article, video, or document link.
             </p>
+
+            <div class="link-preview" id="link-preview" hidden></div>
           </div>
         </fieldset>
+
+        <p class="search-status" id="search-status" role="status"></p>
       </section>
 
       <section class="filters" aria-label="Resource preferences">
         <div class="filter-group">
           <h2 class="filter-label" id="price-label">Price</h2>
 
+          <!-- data-filter / data-value are what the JS reads.
+               The visible labels can be renamed freely. -->
           <div
             class="options"
             id="price-options"
             role="group"
             aria-labelledby="price-label"
+            data-filter="price"
           >
-            <button class="option selected" type="button"
+            <button class="option selected" type="button" data-value="all"
                     aria-pressed="true">All prices</button>
-            <button class="option" type="button"
+            <button class="option" type="button" data-value="free"
                     aria-pressed="false">Free</button>
-            <button class="option" type="button"
+            <button class="option" type="button" data-value="paid"
                     aria-pressed="false">Paid</button>
           </div>
         </div>
@@ -597,32 +743,42 @@
             id="resource-options"
             role="group"
             aria-labelledby="resource-label"
+            data-filter="type"
           >
-            <button class="option selected" type="button"
+            <button class="option selected" type="button" data-value="all"
                     aria-pressed="true">All types</button>
-            <button class="option" type="button"
+            <button class="option" type="button" data-value="articles"
                     aria-pressed="false">Articles</button>
-            <button class="option" type="button"
+            <button class="option" type="button" data-value="images"
                     aria-pressed="false">Images</button>
-            <button class="option" type="button"
+            <button class="option" type="button" data-value="websites"
                     aria-pressed="false">Websites</button>
-            <button class="option" type="button"
+            <button class="option" type="button" data-value="podcasts"
                     aria-pressed="false">Podcasts</button>
-            <button class="option" type="button"
+            <button class="option" type="button" data-value="documents"
                     aria-pressed="false">Documents</button>
-            <button class="option" type="button"
+            <button class="option" type="button" data-value="presentations"
                     aria-pressed="false">Presentations</button>
-            <button class="option" type="button"
+            <button class="option" type="button" data-value="apps"
                     aria-pressed="false">Apps</button>
-            <button class="option" type="button"
+            <button class="option" type="button" data-value="videos"
                     aria-pressed="false">Videos</button>
-            <button class="option" type="button"
+            <button class="option" type="button" data-value="courses"
                     aria-pressed="false">Courses</button>
-            <button class="option" type="button"
+            <button class="option" type="button" data-value="books"
                     aria-pressed="false">Books</button>
-            <button class="option" type="button"
+            <button class="option" type="button" data-value="tools"
                     aria-pressed="false">Tools</button>
           </div>
+        </div>
+
+        <div class="filter-group">
+          <h2 class="filter-label">AI</h2>
+          <label class="ai-toggle">
+            <input type="checkbox" id="ai-toggle">
+            Let AI refine my search
+          </label>
+          <p class="input-help" id="ai-help"></p>
         </div>
 
         <p class="selection-summary" id="selection-summary" role="status">
@@ -695,8 +851,8 @@
       </section>
 
       <p class="note">
-        Visual prototype. Search, recent views, and bookmarks are not connected.
-        Preferences are selectable; resource cards and suggestions are sample content.
+        Prototype. Text and link search, filters, bookmarks and recent views work.
+        Image search and AI are not connected yet; resource cards are sample content.
       </p>
     </main>
 
@@ -707,9 +863,31 @@
         </svg>
         Bookmarks
       </h2>
-      <p class="sidebar-empty">No saved resources yet.</p>
+      <p class="sidebar-empty" id="bookmark-empty">No saved resources yet.</p>
+      <ul class="link-list" id="bookmark-list"></ul>
+      <button class="option add-button" type="button" id="add-bookmark">
+        + Add bookmark
+      </button>
     </aside>
   </div>
+
+  <dialog id="bookmark-dialog" aria-labelledby="bookmark-dialog-title">
+    <form id="bookmark-form" novalidate>
+      <h2 class="filter-label" id="bookmark-dialog-title">Add a bookmark</h2>
+      <label class="field-label" for="bookmark-name">Name (optional)</label>
+      <input id="bookmark-name" type="text" placeholder="AniList">
+      <label class="field-label" for="bookmark-url">Address</label>
+      <input id="bookmark-url" type="url" placeholder="anilist.co">
+      <p class="search-status" id="bookmark-error" role="alert"></p>
+      <div class="dialog-actions">
+        <button class="option" type="button" id="bookmark-cancel">Cancel</button>
+        <button class="search-button" type="submit">Add</button>
+      </div>
+    </form>
+  </dialog>
+
+  <!-- Hover preview for bookmarks; bookmarks.js positions and fills it -->
+  <div class="preview-card" id="preview-card" hidden></div>
 
   <footer>
     Our group's searching engine · Design concept
@@ -717,35 +895,7 @@
     Made by Vadim, Eric, Lucas, and Mohammed
   </footer>
 
-  <script>
-    const optionGroups = document.querySelectorAll(".filters .options");
-    const summary = document.getElementById("selection-summary");
-
-    optionGroups.forEach((group) => {
-      group.addEventListener("click", (event) => {
-        const selectedButton = event.target.closest(".option");
-
-        if (!selectedButton || !group.contains(selectedButton)) {
-          return;
-        }
-
-        group.querySelectorAll(".option").forEach((button) => {
-          const isSelected = button === selectedButton;
-          button.classList.toggle("selected", isSelected);
-          button.setAttribute("aria-pressed", String(isSelected));
-        });
-
-        const price = document.querySelector(
-          "#price-options .selected"
-        ).textContent.trim();
-
-        const resourceType = document.querySelector(
-          "#resource-options .selected"
-        ).textContent.trim();
-
-        summary.textContent = `Selected: ${price} · ${resourceType}`;
-      });
-    });
-  </script>
+  <!-- All behaviour lives in js/. Modules need a server: use Live Preview. -->
+  <script type="module" src="js/app.js"></script>
 </body>
 </html>

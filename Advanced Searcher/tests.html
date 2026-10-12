@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Advanced Searcher tests</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 24px; background: #f6f8fc; color: #243047; }
+    li { margin: 4px 0; font-family: Consolas, monospace; font-size: 13px; }
+    .pass { color: #278051; }
+    .fail { color: #b3261e; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h1>Tests for the pure functions</h1>
+  <p id="total"></p>
+  <ul id="results"></ul>
+
+  <script type="module">
+    import { buildQuery, buildSearchUrl } from "./js/search.js";
+    import { normalizeUrl, faviconUrl } from "./js/bookmarks.js";
+
+    const results = document.querySelector("#results");
+    let passed = 0;
+    let failed = 0;
+
+    function check(name, actual, expected) {
+      const ok = actual === expected;
+      ok ? passed++ : failed++;
+      const row = document.createElement("li");
+      row.className = ok ? "pass" : "fail";
+      row.textContent = ok
+        ? `PASS  ${name}`
+        : `FAIL  ${name}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`;
+      results.append(row);
+    }
+
+    function throws(fn) {
+      try { fn(); return false; } catch { return true; }
+    }
+
+    // buildQuery
+    check("no filters", buildQuery("frieren", { price: "all", type: "all" }), "frieren");
+    check("trims spaces", buildQuery("  frieren  ", { price: "all", type: "all" }), "frieren");
+    check("free + documents", buildQuery("html", { price: "free", type: "documents" }), 'html "free" filetype:pdf');
+    check("images adds no words", buildQuery("cats", { price: "all", type: "images" }), "cats");
+    check("unknown type is ignored", buildQuery("x", { price: "all", type: "nonsense" }), "x");
+
+    // buildSearchUrl
+    check("plain url", buildSearchUrl("frieren", { price: "all", type: "all" }), "https://duckduckgo.com/?q=frieren");
+    check("encodes spaces and quotes", buildSearchUrl('a "b"', { price: "all", type: "all" }), "https://duckduckgo.com/?q=a%20%22b%22");
+    check("videos tab", buildSearchUrl("x", { price: "all", type: "videos" }), "https://duckduckgo.com/?q=x&ia=videos&iax=videos");
+
+    // normalizeUrl
+    check("adds https://", normalizeUrl("anilist.co"), "https://anilist.co/");
+    check("keeps http://", normalizeUrl("http://example.com/a"), "http://example.com/a");
+    check("trims spaces", normalizeUrl("  anilist.co  "), "https://anilist.co/");
+    check("rejects words", throws(() => normalizeUrl("hello")), true);
+    check("rejects spaces inside", throws(() => normalizeUrl("my site.com")), true);
+
+    // faviconUrl
+    check("favicon from domain", faviconUrl("https://anilist.co/anime/1"), "https://www.google.com/s2/favicons?sz=64&domain=anilist.co");
+
+    document.querySelector("#total").textContent = `${passed} passed, ${failed} failed`;
+  </script>
+</body>
+</html>
