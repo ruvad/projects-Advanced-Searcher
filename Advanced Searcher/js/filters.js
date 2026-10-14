@@ -1,30 +1,14 @@
 // filters.js: the Price and Type option groups.
 // The buttons carry data-value="..." in the HTML. This file only reads those values,
 // so the visible labels can be renamed or translated without breaking anything.
+// In both AI modes the choices become rules ("constraints") the AI must follow.
 import { load, save } from "./storage.js";
 
-// What each choice adds to the search query. Tune these freely.
-export const PRICE_RULES = {
-  all: "",
-  free: '"free"',
-  paid: '"price"',
-};
-
-// `query` is added to the search text; `vertical` switches the search engine's tab.
-export const TYPE_RULES = {
-  all: { query: "" },
-  articles: { query: "article" },
-  images: { query: "", vertical: "images" },
-  websites: { query: "" },
-  podcasts: { query: "podcast" },
-  documents: { query: "filetype:pdf" },
-  presentations: { query: "filetype:pptx" },
-  apps: { query: "app" },
-  videos: { query: "", vertical: "videos" },
-  courses: { query: "course" },
-  books: { query: "book" },
-  tools: { query: "tool" },
-};
+/** The resource types, in the order mode 2 shows its result groups. */
+export const TYPE_VALUES = [
+  "articles", "images", "websites", "podcasts", "documents", "presentations",
+  "apps", "videos", "courses", "books", "tools",
+];
 
 const STORAGE_KEY = "filters";
 
@@ -59,10 +43,11 @@ export function setupFilters(onChange) {
 }
 
 /**
+ * Highlights the button whose data-value matches. Also used by the mode switch.
  * @param {Element} group
  * @param {string} value
  */
-function markSelected(group, value) {
+export function markSelected(group, value) {
   for (const button of group.querySelectorAll("[data-value]")) {
     const isSelected = button.getAttribute("data-value") === value;
     button.classList.toggle("selected", isSelected);
@@ -78,4 +63,28 @@ export function describeFilters() {
     if (selected) labels.push(selected.textContent.trim());
   }
   return labels.join(" · ");
+}
+
+/**
+ * The visible label of one button, e.g. ("type", "videos") → "Videos".
+ * @param {string} filter "price" or "type"
+ * @param {string} value
+ */
+export function labelFor(filter, value) {
+  const button = document.querySelector(`[data-filter="${filter}"] [data-value="${value}"]`);
+  return button ? button.textContent.trim() : value;
+}
+
+/**
+ * The filters as rules for the AI. Pure: no page access, so tests.html can check it.
+ * { price: "free", type: "videos" } → ["Only free resources.", "Only resources of type: videos."]
+ * @param {{ price: string, type: string }} filters
+ * @returns {string[]}
+ */
+export function describeConstraints(filters) {
+  const rules = [];
+  if (filters.price === "free") rules.push("Only free resources.");
+  if (filters.price === "paid") rules.push("Only paid resources.");
+  if (TYPE_VALUES.includes(filters.type)) rules.push("Only resources of type: " + filters.type + ".");
+  return rules;
 }

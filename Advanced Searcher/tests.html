@@ -12,11 +12,16 @@
 </head>
 <body>
   <h1>Tests for the pure functions</h1>
-  <p id="total"></p>
+  <p id="total">Running…</p>
   <ul id="results"></ul>
 
   <script type="module">
-    import { buildQuery, buildSearchUrl } from "./js/search.js";
+    import { buildGoogleUrl, cleanFields, describeFields, buildFieldsPrompt } from "./js/search.js";
+    import { readOutputText, parseJsonAnswer, geminiErrorMessage } from "./js/ai.js";
+    import { tavilyErrorMessage } from "./js/tavily.js";
+    import { buildWebQuery, groupResults, siteOf } from "./js/organize.js";
+    import { describeConstraints } from "./js/filters.js";
+    import { demoKey } from "./js/demo.js";
     import { normalizeUrl, faviconUrl } from "./js/bookmarks.js";
 
     const results = document.querySelector("#results");
@@ -24,7 +29,7 @@
     let failed = 0;
 
     function check(name, actual, expected) {
-      const ok = actual === expected;
+      const ok = JSON.stringify(actual) === JSON.stringify(expected);
       ok ? passed++ : failed++;
       const row = document.createElement("li");
       row.className = ok ? "pass" : "fail";
@@ -38,26 +43,92 @@
       try { fn(); return false; } catch { return true; }
     }
 
-    // buildQuery
-    check("no filters", buildQuery("frieren", { price: "all", type: "all" }), "frieren");
-    check("trims spaces", buildQuery("  frieren  ", { price: "all", type: "all" }), "frieren");
-    check("free + documents", buildQuery("html", { price: "free", type: "documents" }), 'html "free" filetype:pdf');
-    check("images adds no words", buildQuery("cats", { price: "all", type: "images" }), "cats");
-    check("unknown type is ignored", buildQuery("x", { price: "all", type: "nonsense" }), "x");
+    const empty = { allWords: "", exactPhrase: "", noneOfWords: "", site: "", fileType: "", lastUpdate: "", language: "", region: "" };
+    const noFilters = { price: "all", type: "all" };
 
-    // buildSearchUrl
-    check("plain url", buildSearchUrl("frieren", { price: "all", type: "all" }), "https://duckduckgo.com/?q=frieren");
-    check("encodes spaces and quotes", buildSearchUrl('a "b"', { price: "all", type: "all" }), "https://duckduckgo.com/?q=a%20%22b%22");
-    check("videos tab", buildSearchUrl("x", { price: "all", type: "videos" }), "https://duckduckgo.com/?q=x&ia=videos&iax=videos");
+    // ---- search.js (mode 1) ----
+    check("google url: words only",
+      buildGoogleUrl({ ...empty, allWords: "anime editing" }),
+      "https://www.google.com/search?as_q=anime+editing");
+    check("google url: all 8 fields",
+      buildGoogleUrl({ allWords: "editor", exactPhrase: "free", noneOfWords: "reddit", site: "github.com",
+                       fileType: "pdf", lastUpdate: "y", language: "en", region: "CA" }),
+      "https://www.google.com/search?as_q=editor&as_epq=free&as_eq=reddit&as_sitesearch=github.com&as_filetype=pdf&as_qdr=y&lr=lang_en&cr=countryCA");
+    check("clean: unknown codes become empty",
+      cleanFields({ allWords: " a  b ", fileType: "docx", lastUpdate: "z", language: "xx", region: "zz" }),
+      { ...empty, allWords: "a b" });
+    check("clean: site loses https:// and path",
+      cleanFields({ allWords: "x", site: "https://www.YouTube.com/watch?v=1" }).site,
+      "www.youtube.com");
+    check("clean: region gets upper case", cleanFields({ allWords: "x", region: "ca" }).region, "CA");
+    check("clean: exact phrase loses quotes", cleanFields({ allWords: "x", exactPhrase: "\"free\"" }).exactPhrase, "free");
+    check("clean: missing answer", cleanFields(null), empty);
+    check("describe fields",
+      describeFields({ ...empty, allWords: "editor", exactPhrase: "free", lastUpdate: "y" }),
+      "all these words: editor · exact phrase: “free” · last update: past year");
+    check("prompt contains the request", buildFieldsPrompt("frieren", noFilters).includes("User request: frieren"), true);
+    check("prompt contains the rules",
+      buildFieldsPrompt("x", { price: "free", type: "videos" }).includes("Only free resources. Only resources of type: videos."), true);
 
-    // normalizeUrl
-    check("adds https://", normalizeUrl("anilist.co"), "https://anilist.co/");
-    check("keeps http://", normalizeUrl("http://example.com/a"), "http://example.com/a");
-    check("trims spaces", normalizeUrl("  anilist.co  "), "https://anilist.co/");
-    check("rejects words", throws(() => normalizeUrl("hello")), true);
-    check("rejects spaces inside", throws(() => normalizeUrl("my site.com")), true);
+    // ---- filters.js ----
+    check("constraints: none", describeConstraints(noFilters), []);
+    check("constraints: paid + books", describeConstraints({ price: "paid", type: "books" }),
+      ["Only paid resources.", "Only resources of type: books."]);
+    check("constraints: unknown type ignored", describeConstraints({ price: "all", type: "nonsense" }), []);
 
-    // faviconUrl
+    // ---- ai.js ----
+    // The reply shape below is Google's documented example for the Interactions API.
+    const reply = { status: "completed", steps: [
+      { type: "thought", summary: [] },
+      { type: "model_output", content: [{ type: "text", text: "{\"allWords\":" }, { type: "text", text: "\"x\"}" }] },
+    ] };
+    check("read output: skips thoughts, joins text", readOutputText(reply), "{\"allWords\":\"x\"}");
+    check("read output: nothing", readOutputText({}), "");
+    check("parse json", parseJsonAnswer("{\"a\":1}"), { a: 1 });
+    check("parse json in ``` fences", parseJsonAnswer("```json\n{\"a\":1}\n```"), { a: 1 });
+    check("parse junk throws", throws(() => parseJsonAnswer("not json")), true);
+    // This error body is the real answer to a fake key, recorded on Oct 14 (note the [ ] around it).
+    const badKey = [{ error: { code: 400, message: "API key not valid. Please pass a valid API key.",
+      status: "INVALID_ARGUMENT", details: [{ reason: "API_KEY_INVALID" }] } }];
+    check("gemini error: invalid key (list-wrapped)", geminiErrorMessage(400, badKey),
+      "Your Gemini key isn't valid. Check it in the AI section.");
+    check("gemini error: limit", geminiErrorMessage(429, null),
+      "Gemini's free limit is used up for now. Wait a minute and try again.");
+    check("gemini error: other message is shown", geminiErrorMessage(400, { error: { message: "Bad schema" } }),
+      "Gemini rejected the request: Bad schema");
+
+    // ---- tavily.js ----
+    check("tavily error: 401", tavilyErrorMessage(401), "Your Tavily key isn't valid. Check it in the AI section.");
+    check("tavily error: 432", tavilyErrorMessage(432), "Your Tavily search limit is used up for this month.");
+
+    // ---- organize.js (mode 2) ----
+    check("web query: plain", buildWebQuery(" frieren ", noFilters), "frieren");
+    check("web query: free + tools", buildWebQuery("anime editing", { price: "free", type: "tools" }), "anime editing free tool");
+    const web = [
+      { title: "A", url: "https://www.a.com/x", content: "" },
+      { title: "B", url: "https://b.org/", content: "" },
+      { title: "C", url: "https://c.net/", content: "" },
+    ];
+    const groups = groupResults({ results: [
+      { index: 2, type: "videos", price: "free", reason: "r2" },
+      { index: 0, type: "articles", price: "maybe", reason: "r0" },
+      { index: 2, type: "videos", price: "free", reason: "repeat" },
+      { index: 9, type: "tools", price: "paid", reason: "no such result" },
+      { index: 1, type: "spaceships", price: "paid", reason: "bad type" },
+    ] }, web);
+    check("group: order follows the Type list", groups.map((g) => g.type), ["articles", "videos"]);
+    check("group: real address and site, unclear price becomes unknown", groups[0].items[0],
+      { title: "A", url: "https://www.a.com/x", site: "a.com", price: "unknown", reason: "r0" });
+    check("group: repeats and bad numbers skipped", groups[1].items.length, 1);
+    check("group: empty answer", groupResults(null, web), []);
+    check("site of a bad url", siteOf("not a url"), "not a url");
+
+    // ---- demo.js ----
+    check("demo key ignores case and spaces", demoKey("  Free   Anime ", noFilters), "free anime|all|all");
+
+    // ---- bookmarks.js ----
+    check("url: adds https://", normalizeUrl("anilist.co"), "https://anilist.co/");
+    check("url: rejects spaces inside", throws(() => normalizeUrl("my site.com")), true);
     check("favicon from domain", faviconUrl("https://anilist.co/anime/1"), "https://www.google.com/s2/favicons?sz=64&domain=anilist.co");
 
     document.querySelector("#total").textContent = `${passed} passed, ${failed} failed`;

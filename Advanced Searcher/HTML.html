@@ -187,6 +187,9 @@
         </fieldset>
 
         <p class="search-status" id="search-status" role="status"></p>
+
+        <!-- Mode 1 writes what Gemini filled in here. -->
+        <p class="input-help" id="ai-filled" hidden></p>
       </section>
 
       <!-- Filters -->
@@ -304,15 +307,58 @@
           </div>
         </div>
 
-        <div class="filter-group">
-          <h2 class="filter-label">AI</h2>
+        <!-- AI: the two search modes and the keys. JS (mode.js, keys.js, demo.js) uses these ids. -->
+        <div class="filter-group" id="ai-group">
+          <h2 class="filter-label" id="ai-label">AI search mode</h2>
 
-          <label class="ai-toggle">
-            <input type="checkbox" id="ai-toggle">
-            Let AI refine my search
-          </label>
+          <div
+            class="options"
+            id="mode-options"
+            role="group"
+            aria-labelledby="ai-label"
+          >
+            <button class="option selected" type="button"
+                    data-value="advanced" aria-pressed="true">
+              AI advanced search
+            </button>
 
-          <p class="input-help" id="ai-help"></p>
+            <button class="option" type="button"
+                    data-value="organize" aria-pressed="false">
+              AI finds &amp; organizes
+            </button>
+          </div>
+
+          <p class="input-help" id="mode-help"></p>
+
+          <!-- Keys are saved only in this browser (localStorage), never in the code. -->
+          <form class="search-box" id="key-form" autocomplete="off">
+            <input
+              class="search-input"
+              id="gemini-key"
+              type="password"
+              placeholder="Paste Gemini key"
+              aria-label="Gemini API key"
+            >
+
+            <input
+              class="search-input"
+              id="tavily-key"
+              type="password"
+              placeholder="Paste Tavily key (mode 2)"
+              aria-label="Tavily API key"
+            >
+
+            <button class="search-button" type="submit">Save</button>
+            <button class="option" type="button" id="key-remove">Remove</button>
+          </form>
+
+          <p class="input-help" id="key-status" role="status"></p>
+
+          <p class="input-help">
+            Keys stay in this browser only. Get free keys:
+            <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Gemini</a> ·
+            <a href="https://app.tavily.com/" target="_blank" rel="noopener">Tavily</a>
+          </p>
         </div>
 
         <p class="selection-summary" id="selection-summary" role="status">
@@ -320,6 +366,9 @@
         </p>
       </section>
 
+      <!-- Results area: the sample cards show until the first mode 2 search,
+           then organize.js replaces everything inside #results. -->
+      <div id="results">
       <!-- Suggestions -->
       <section aria-labelledby="suggestions-heading">
         <h2 class="section-heading" id="suggestions-heading">
@@ -385,12 +434,13 @@
           </article>
         </div>
       </section>
+      </div>
 
       <p class="note">
-        Text search opens DuckDuckGo in a new tab.
-        Images and AI are coming later.
-        Resource cards are examples; bookmarks and recent views
-        are saved in this browser.
+        Text search uses AI. Mode 1: Gemini fills in Google's Advanced Search.
+        Mode 2: Tavily finds websites and Gemini sorts them.
+        Keys, bookmarks and recent views are saved only in this browser.
+        Image search is not connected yet.
       </p>
     </main>
 
