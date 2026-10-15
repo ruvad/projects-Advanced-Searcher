@@ -32,8 +32,7 @@ export const SORT_SCHEMA = {
   type: "object",
   properties: {
     results: {
-      type: "array",
-      maxItems: MAX_SHOWN,
+      type: "array", // no maxItems: it's a reported cause of Gemini server errors; groupResults() limits instead
       items: {
         type: "object",
         properties: {
@@ -91,6 +90,7 @@ export function groupResults(sorted, webResults) {
   const byType = {};
 
   for (const pick of Array.isArray(sorted?.results) ? sorted.results : []) {
+    if (used.size >= MAX_SHOWN) break; // at most 10 results in total
     const result = webResults[pick.index];
     if (!result || used.has(pick.index) || !TYPE_VALUES.includes(pick.type)) continue;
     used.add(pick.index);
@@ -102,7 +102,7 @@ export function groupResults(sorted, webResults) {
       reason: typeof pick.reason === "string" ? pick.reason.trim() : "",
     });
   }
-  return TYPE_VALUES.filter((type) => byType[type]).map((type) => ({ type, items: byType[type].slice(0, MAX_SHOWN) }));
+  return TYPE_VALUES.filter((type) => byType[type]).map((type) => ({ type, items: byType[type] }));
 }
 
 /** "https://www.youtube.com/watch?v=1" → "youtube.com". Pure. @param {string} url */

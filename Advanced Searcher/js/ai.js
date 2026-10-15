@@ -5,25 +5,47 @@
 export const GEMINI_MODEL = "gemini-3.8-flash";
 const ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/interactions";
 
+/** An error from Gemini's side (HTTP 5xx), worth one retry. */
+class GeminiServerError extends Error {}
+
 /**
  * Sends a prompt and a JSON schema; returns Gemini's answer as a JS object.
  * Throws an Error whose message can be shown to the user as is.
+ * If Gemini's server fails (5xx), it waits a moment and retries once WITHOUT the strict
+ * answer format, asking for the JSON in plain words instead: some server errors are
+ * caused by the strict format itself (reported on Google's developer forum).
  * @param {string} apiKey
  * @param {string} prompt
  * @param {object} schema the JSON shape Gemini must answer in
  */
 export async function askGemini(apiKey, prompt, schema) {
+  try {
+    return await callGemini(apiKey, prompt, schema);
+  } catch (error) {
+    if (!(error instanceof GeminiServerError)) throw error;
+    console.warn("Gemini server error with the strict format; retrying without it.", error.message);
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    const plainPrompt = prompt + "\n\nAnswer only with JSON that matches this JSON Schema:\n" + JSON.stringify(schema);
+    return await callGemini(apiKey, plainPrompt, null);
+  }
+}
+
+/**
+ * One request. With a schema, Gemini is forced into that shape; with null, it isn't.
+ * @param {string} apiKey
+ * @param {string} prompt
+ * @param {object | null} schema
+ */
+async function callGemini(apiKey, prompt, schema) {
+  const request = { model: GEMINI_MODEL, input: prompt, store: false }; // store: false = don't keep our searches
+  if (schema) request.response_format = { type: "text", mime_type: "application/json", schema };
+
   let response;
   try {
     response = await fetch(ENDPOINT, {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-      body: JSON.stringify({
-        model: GEMINI_MODEL,
-        input: prompt,
-        store: false, // don't keep our searches on Google's servers
-        response_format: { type: "text", mime_type: "application/json", schema },
-      }),
+      body: JSON.stringify(request),
       signal: AbortSignal.timeout(60000),
     });
   } catch (error) {
@@ -31,7 +53,11 @@ export async function askGemini(apiKey, prompt, schema) {
   }
 
   const body = await response.json().catch(() => null);
-  if (!response.ok) throw new Error(geminiErrorMessage(response.status, body));
+  if (!response.ok) {
+    console.error("Gemini replied with HTTP " + response.status + ":", body); // full details for DevTools
+    const message = geminiErrorMessage(response.status, body);
+    throw response.status >= 500 ? new GeminiServerError(message) : new Error(message);
+  }
 
   if (body?.status === "incomplete") throw new Error("Gemini's answer was cut off. Try a shorter request.");
   if (body?.status && body.status !== "completed") throw new Error("Gemini couldn't finish (status: " + body.status + ").");
@@ -84,7 +110,9 @@ export function geminiErrorMessage(status, body) {
   if (status === 403) return "Gemini refused this key. Check that it's a Gemini API key from Google AI Studio.";
   if (status === 429) return "Gemini's free limit is used up for now. Wait a minute and try again.";
   if (status === 404) return "Gemini model " + GEMINI_MODEL + " isn't available for this key.";
-  if (status >= 500) return "Gemini is having trouble right now. Try again in a moment.";
+  if (status >= 500) {
+    return "Gemini is having trouble right now (error " + status + (error.message ? ": " + error.message : "") + "). Try again in a moment.";
+  }
   return "Gemini rejected the request" + (error.message ? ": " + error.message : ".");
 }
 

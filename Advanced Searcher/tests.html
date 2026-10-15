@@ -94,6 +94,8 @@
       "Your Gemini key isn't valid. Check it in the AI section.");
     check("gemini error: limit", geminiErrorMessage(429, null),
       "Gemini's free limit is used up for now. Wait a minute and try again.");
+    check("gemini error: 500 shows Google's message", geminiErrorMessage(500, { error: { code: 500, message: "Internal error encountered." } }),
+      "Gemini is having trouble right now (error 500: Internal error encountered.). Try again in a moment.");
     check("gemini error: other message is shown", geminiErrorMessage(400, { error: { message: "Bad schema" } }),
       "Gemini rejected the request: Bad schema");
 
@@ -121,6 +123,9 @@
       { title: "A", url: "https://www.a.com/x", site: "a.com", price: "unknown", reason: "r0" });
     check("group: repeats and bad numbers skipped", groups[1].items.length, 1);
     check("group: empty answer", groupResults(null, web), []);
+    const many = Array.from({ length: 14 }, (_, i) => ({ title: "R" + i, url: "https://r" + i + ".com/", content: "" }));
+    const capped = groupResults({ results: many.map((_, i) => ({ index: i, type: "tools", price: "free", reason: "" })) }, many);
+    check("group: at most 10 results in total", capped[0].items.length, 10);
     check("site of a bad url", siteOf("not a url"), "not a url");
 
     // ---- demo.js ----

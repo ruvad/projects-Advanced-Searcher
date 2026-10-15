@@ -32,7 +32,7 @@ export const REGIONS = (
  *             fileType: string, lastUpdate: string, language: string, region: string }} Fields
  */
 
-/** The JSON shape Gemini must answer in. "" means "leave this field empty". */
+/** The JSON shape Gemini must answer in. "" means "leave this field empty". Kept simple on purpose. */
 export const FIELDS_SCHEMA = {
   type: "object",
   properties: {
@@ -40,8 +40,10 @@ export const FIELDS_SCHEMA = {
     exactPhrase: { type: "string", description: "This exact word or phrase, or empty." },
     noneOfWords: { type: "string", description: "None of these words (space-separated), or empty." },
     site: { type: "string", description: "Site or domain such as youtube.com or .edu, or empty." },
-    fileType: { type: "string", enum: ["", ...FILE_TYPES] },
-    lastUpdate: { type: "string", enum: ["", ...Object.keys(TIME_RANGES)] },
+    // No "enum" lists here: an empty string inside an enum is a suspected cause of
+    // Gemini server errors. cleanFields() checks these values instead.
+    fileType: { type: "string", description: "One of " + FILE_TYPES.join(", ") + ", or empty." },
+    lastUpdate: { type: "string", description: "One of h, d, w, m, y, or empty." },
     language: { type: "string", description: "Language code such as en, fr, zh-CN, or empty." },
     region: { type: "string", description: "Two-letter country code such as CA or US, or empty." },
   },
