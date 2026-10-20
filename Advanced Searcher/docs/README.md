@@ -1,4 +1,4 @@
-# Advanced Searcher
+# VELM Searcher
 
 An AI-powered search categorizer: pick a preset, type a request, and see results sorted into categories like Free / Subscription.
 

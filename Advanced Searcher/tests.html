@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Advanced Searcher tests</title>
+  <title>VELM Searcher tests</title>
   <style>
     body { font-family: Arial, sans-serif; padding: 24px; background: #f6f8fc; color: #243047; }
     li { margin: 4px 0; font-family: Consolas, monospace; font-size: 13px; }
@@ -16,7 +16,7 @@
   <ul id="results"></ul>
 
   <script type="module">
-    import { buildGoogleUrl, cleanFields, describeFields, buildFieldsPrompt } from "./js/search.js";
+    import { buildGoogleUrl, cleanFields, describeFields, buildFieldsPrompt, isCopyPaste } from "./js/search.js";
     import { readOutputText, parseJsonAnswer, geminiErrorMessage } from "./js/ai.js";
     import { tavilyErrorMessage } from "./js/tavily.js";
     import { buildWebQuery, groupResults, siteOf } from "./js/organize.js";
@@ -63,9 +63,16 @@
     check("clean: region gets upper case", cleanFields({ allWords: "x", region: "ca" }).region, "CA");
     check("clean: exact phrase loses quotes", cleanFields({ allWords: "x", exactPhrase: "\"free\"" }).exactPhrase, "free");
     check("clean: missing answer", cleanFields(null), empty);
-    check("describe fields",
-      describeFields({ ...empty, allWords: "editor", exactPhrase: "free", lastUpdate: "y" }),
-      "all these words: editor · exact phrase: “free” · last update: past year");
+    check("describe fields: all 8, empty ones as —",
+      describeFields({ ...empty, allWords: "editor", exactPhrase: "free", lastUpdate: "y", language: "en" }),
+      "all these words: editor · exact phrase: “free” · none of these words: — · site: — · file type: — · last update: past year · language: en · region: —");
+    check("copy-paste: whole request copied",
+      isCopyPaste({ ...empty, allWords: "Free anime editing software!", language: "en" }, "free anime editing software"), true);
+    check("copy-paste: request taken apart",
+      isCopyPaste({ ...empty, allWords: "anime editing software", exactPhrase: "free" }, "free anime editing software"), false);
+    check("copy-paste: short requests are fine",
+      isCopyPaste({ ...empty, allWords: "frieren" }, "frieren"), false);
+    check("prompt forbids copying", buildFieldsPrompt("x", noFilters).includes("Do NOT copy the request into allWords"), true);
     check("prompt contains the request", buildFieldsPrompt("frieren", noFilters).includes("User request: frieren"), true);
     check("prompt contains the rules",
       buildFieldsPrompt("x", { price: "free", type: "videos" }).includes("Only free resources. Only resources of type: videos."), true);

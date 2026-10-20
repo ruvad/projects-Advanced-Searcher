@@ -1,4 +1,4 @@
-# Web Guide: Everything You Need to Plan Advanced Searcher
+# Web Guide: Everything You Need to Plan VELM Searcher
 
 Contents:
 

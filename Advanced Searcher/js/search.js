@@ -59,15 +59,46 @@ export function buildFieldsPrompt(text, filters) {
   const rules = describeConstraints(filters);
   return [
     "You fill in Google's Advanced Search form so that it finds what the user asks for.",
-    "Fields: allWords (all these words), exactPhrase (this exact word or phrase), noneOfWords (none of these words),",
-    "site (site or domain), fileType (" + FILE_TYPES.join(", ") + "),",
-    "lastUpdate (h = past hour, d = past 24 hours, w = past week, m = past month, y = past year),",
-    "language (a language code) and region (a two-letter country code).",
-    "Use an empty string for every field the request doesn't need. Always fill allWords.",
+    "Do NOT copy the request into allWords. Take the request apart and decide every field, one by one:",
+    "- allWords: only the 2-6 essential topic keywords. Drop filler words (find, I want, please, some, good)",
+    "  and drop every word you moved into another field.",
+    "- exactPhrase: a name, title or phrase whose words must appear together, or a word the results",
+    "  must contain (for example free, when the user wants free things). Otherwise empty.",
+    "- noneOfWords: everything the user wants to avoid (after no, not, without, except), space-separated.",
+    "- site: a website or kind of site the request names: YouTube -> youtube.com, GitHub -> github.com,",
+    "  universities -> .edu, government -> .gov. Otherwise empty.",
+    "- fileType: one of " + FILE_TYPES.join(", ") + " when the request wants that kind of file",
+    "  (PDF -> pdf, slides -> ppt, spreadsheet -> xls, Word document -> doc). Otherwise empty.",
+    "- lastUpdate: h, d, w, m or y when the request wants recent things",
+    "  (today -> d, this week -> w, this month -> m, latest, recent or this year -> y). Otherwise empty.",
+    "- language: the language code of the language the request is written in (en, ru, fr...),",
+    "  unless the user asks for another language. Always fill it.",
+    "- region: a two-letter country code only when the request names a country or place. Otherwise empty.",
+    "Fill a field whenever the request supports it, but never add restrictions the user didn't ask for:",
+    "too many restrictions make Google find nothing.",
+    "Example: \"free anime editing software, no reddit, latest\" ->",
+    "  allWords \"anime editing software\", exactPhrase \"free\", noneOfWords \"reddit\", lastUpdate \"y\", language \"en\".",
+    "Example: \"beginner guitar lessons on YouTube from this month\" ->",
+    "  allWords \"beginner guitar lessons\", site \"youtube.com\", lastUpdate \"m\", language \"en\".",
+    "Example: \"Python cheat sheet PDF, Canada\" ->",
+    "  allWords \"python cheat sheet\", fileType \"pdf\", region \"CA\", language \"en\".",
     "Keep the search words in the language the user wrote in.",
     rules.length ? "The results must also follow these rules: " + rules.join(" ") : "",
     "User request: " + text,
   ].filter(Boolean).join("\n");
+}
+
+/**
+ * True when Gemini just copied the request into allWords and left every other field empty
+ * (language aside, which is always filled). Pure.
+ * @param {Fields} fields
+ * @param {string} text the user's request
+ */
+export function isCopyPaste(fields, text) {
+  const simple = (value) => value.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+  const othersEmpty = !fields.exactPhrase && !fields.noneOfWords && !fields.site &&
+    !fields.fileType && !fields.lastUpdate && !fields.region;
+  return othersEmpty && simple(fields.allWords) === simple(text) && simple(text).split(" ").length > 2;
 }
 
 /**
@@ -110,20 +141,23 @@ export function buildGoogleUrl(fields) {
 }
 
 /**
- * For the "AI filled: ..." line under the search box. Pure.
+ * All 8 fields for the "AI filled" line, empty ones shown as "—", in the order of
+ * Google's Advanced Search form. Pure. Google itself can't show them all again
+ * (its Advanced Search page drops most of them; checked Oct 19), so this line is the full record.
  * @param {Fields} fields
  */
 export function describeFields(fields) {
-  const parts = [];
-  if (fields.allWords) parts.push("all these words: " + fields.allWords);
-  if (fields.exactPhrase) parts.push("exact phrase: “" + fields.exactPhrase + "”");
-  if (fields.noneOfWords) parts.push("none of these words: " + fields.noneOfWords);
-  if (fields.site) parts.push("site: " + fields.site);
-  if (fields.fileType) parts.push("file type: " + fields.fileType);
-  if (fields.lastUpdate) parts.push("last update: " + TIME_RANGES[fields.lastUpdate]);
-  if (fields.language) parts.push("language: " + fields.language);
-  if (fields.region) parts.push("region: " + fields.region);
-  return parts.join(" · ");
+  const show = (value) => value || "—";
+  return [
+    "all these words: " + show(fields.allWords),
+    "exact phrase: " + (fields.exactPhrase ? "“" + fields.exactPhrase + "”" : "—"),
+    "none of these words: " + show(fields.noneOfWords),
+    "site: " + show(fields.site),
+    "file type: " + show(fields.fileType),
+    "last update: " + show(TIME_RANGES[fields.lastUpdate]),
+    "language: " + show(fields.language),
+    "region: " + show(fields.region),
+  ].join(" · ");
 }
 
 /**
@@ -134,7 +168,16 @@ export function describeFields(fields) {
  * @returns {Promise<Fields>}
  */
 export async function fillAdvancedFields(apiKey, text, filters) {
-  const fields = cleanFields(await askGemini(apiKey, buildFieldsPrompt(text, filters), FIELDS_SCHEMA));
+  const prompt = buildFieldsPrompt(text, filters);
+  let fields = cleanFields(await askGemini(apiKey, prompt, FIELDS_SCHEMA));
+
+  // Copy-paste check: if Gemini just repeated the request, ask once more, saying what was wrong.
+  if (isCopyPaste(fields, text)) {
+    const retry = prompt + "\n\nYour previous answer only copied the request into allWords. " +
+      "Split it into the separate fields as described above.";
+    fields = cleanFields(await askGemini(apiKey, retry, FIELDS_SCHEMA));
+  }
+
   if (!fields.allWords && !fields.exactPhrase) {
     throw new Error("Gemini didn't fill in any search words. Try rephrasing your request.");
   }
