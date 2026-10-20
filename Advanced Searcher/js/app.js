@@ -3,8 +3,12 @@ import { filterState, setupFilters, describeFilters } from "./filters.js";
 import { getMode, setMode, setupModeSwitch } from "./mode.js";
 import { getKey, setupKeyForm } from "./keys.js";
 import { fillAdvancedFields, buildGoogleUrl, describeFields } from "./search.js";
-import { findAndOrganize, renderResults } from "./organize.js";
-import { IS_DEMO, saveDemoFields, savedDemoFields, setupDemoSwitch } from "./demo.js";
+import { findAndOrganize, renderResults, buildWebQuery } from "./organize.js";
+import { searchWeb } from "./tavily.js";
+import {
+  saveDemoFields, saveDemoResults, demoFields, demoGroups,
+  skipLiveAi, useDemoBackup, fakeDelay, setupDemoSwitch,
+} from "./demo.js";
 import { addBookmark, normalizeUrl, renderBookmarks } from "./bookmarks.js";
 import { getPreview, fillPreviewCard } from "./preview.js";
 import { addRecent, addRecentSearch, renderRecent, setRerunHandler } from "./recent.js";
@@ -83,20 +87,21 @@ async function runAdvancedSearch(text) {
   status.textContent = "Asking Gemini…";
 
   let fields;
-  let fromDemo = false;
+  let demoNote = "";
   try {
+    if (skipLiveAi()) throw new Error("Demo mode: Gemini skipped.");
     const key = getKey("gemini");
     if (!key) throw new Error("Add your Gemini key in the AI section first.");
     fields = await fillAdvancedFields(key, text, filterState);
-    if (IS_DEMO) saveDemoFields(text, filterState, fields);
+    saveDemoFields(text, filterState, fields); // only saves in demo mode
   } catch (error) {
-    fields = savedDemoFields(text, filterState); // null unless ?demo and this search was saved
-    if (!fields) {
+    if (!skipLiveAi() && !useDemoBackup()) {
       tab.close();
       status.textContent = error.message;
       return;
     }
-    fromDemo = true;
+    await fakeDelay(1200, 2200); // demo answers "think" for a moment too
+    ({ fields, note: demoNote } = demoFields(text, filterState));
   }
 
   const url = buildGoogleUrl(fields);
@@ -106,7 +111,7 @@ async function runAdvancedSearch(text) {
   }
   tab.location.href = url;
   status.textContent = "";
-  aiFilled.textContent = (fromDemo ? "Saved demo answer. " : "") + "AI filled: " + describeFields(fields);
+  aiFilled.textContent = (demoNote ? demoNote + " Filled: " : "AI filled: ") + describeFields(fields);
   aiFilled.hidden = false;
   addRecent("Search: " + text, url);
 }
@@ -117,22 +122,40 @@ async function runAdvancedSearch(text) {
  */
 async function runOrganizedSearch(text) {
   const keys = { gemini: getKey("gemini"), tavily: getKey("tavily") };
-  const missing = [!keys.gemini && "Gemini", !keys.tavily && "Tavily"].filter(Boolean);
-  if (missing.length) {
-    status.textContent = "Add your " + missing.join(" and ") + " key in the AI section first.";
-    return;
+  status.textContent = "Searching the web and sorting the results…";
+
+  let groups;
+  let demoNote = "";
+  try {
+    if (skipLiveAi()) throw new Error("Demo mode: Gemini skipped.");
+    const missing = [!keys.gemini && "Gemini", !keys.tavily && "Tavily"].filter(Boolean);
+    if (missing.length) throw new Error("Add your " + missing.join(" and ") + " key in the AI section first.");
+    groups = await findAndOrganize(keys, text, filterState);
+    saveDemoResults(text, filterState, groups); // only saves in demo mode
+  } catch (error) {
+    if (!skipLiveAi() && !useDemoBackup()) {
+      status.textContent = error.message;
+      return;
+    }
+    await fakeDelay(2000, 3500); // demo answers "search" for a moment too
+    const demo = await demoGroups(text, filterState,
+      () => searchWeb(keys.tavily, buildWebQuery(text, filterState), 15));
+    if (!demo) {
+      status.textContent = "Demo mode has no results for this search. Try “free anime editing software” " +
+        "or “learn JavaScript for beginners”.";
+      return;
+    }
+    ({ groups, note: demoNote } = demo);
   }
 
-  status.textContent = "Searching the web and sorting the results…";
-  try {
-    const groups = await findAndOrganize(keys, text, filterState);
-    renderResults(results, text, groups);
-    status.textContent = "";
-    addRecentSearch("AI: " + text, text);
-    results.scrollIntoView({ behavior: "smooth", block: "start" });
-  } catch (error) {
-    status.textContent = error.message;
+  renderResults(results, text, groups);
+  status.textContent = "";
+  if (demoNote) {
+    aiFilled.textContent = demoNote;
+    aiFilled.hidden = false;
   }
+  addRecentSearch("AI: " + text, text);
+  results.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 // A saved mode 2 search in "Recent views" runs again, live.

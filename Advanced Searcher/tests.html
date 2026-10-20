@@ -21,7 +21,7 @@
     import { tavilyErrorMessage } from "./js/tavily.js";
     import { buildWebQuery, groupResults, siteOf } from "./js/organize.js";
     import { describeConstraints } from "./js/filters.js";
-    import { demoKey } from "./js/demo.js";
+    import { demoKey, ruleFields, preparedFor, groupDemoItems, guessType } from "./js/demo.js";
     import { normalizeUrl, faviconUrl } from "./js/bookmarks.js";
 
     const results = document.querySelector("#results");
@@ -137,6 +137,20 @@
 
     // ---- demo.js ----
     check("demo key ignores case and spaces", demoKey("  Free   Anime ", noFilters), "free anime|all|all");
+    check("demo rules: request taken apart",
+      ruleFields("free anime editing software, no reddit, latest", noFilters),
+      { allWords: "anime editing software", exactPhrase: "free", noneOfWords: "reddit", site: "", fileType: "", lastUpdate: "y", language: "en", region: "" });
+    check("demo rules: site, file type, country",
+      ruleFields("python cheat sheet pdf on github canada", noFilters),
+      { allWords: "python cheat sheet", exactPhrase: "", noneOfWords: "", site: "github.com", fileType: "pdf", lastUpdate: "", language: "en", region: "CA" });
+    check("demo rules: filters fill fields", ruleFields("chemistry", { price: "free", type: "documents" }).fileType + "|" + ruleFields("chemistry", { price: "free", type: "documents" }).exactPhrase, "pdf|free");
+    check("demo rules: Russian request", ruleFields("уроки рисования", noFilters).language, "ru");
+    check("demo topic: anime editing matches", preparedFor("Free anime editing software")?.words, ["anime", "edit"]);
+    check("demo topic: no match", preparedFor("chemistry homework"), null);
+    check("demo groups: Free filter drops paid", groupDemoItems(preparedFor("anime editing").results, { price: "free", type: "all" })[0].items.length, 5);
+    check("demo groups: grouped by type in order", groupDemoItems(preparedFor("javascript").results, noFilters).map((g) => g.type), ["articles", "courses", "books"]);
+    check("guess type", [guessType("https://www.youtube.com/watch?v=1", "x"), guessType("https://a.com/f.pdf", "x"), guessType("https://a.com", "Some page")],
+      ["videos", "documents", "websites"]);
 
     // ---- bookmarks.js ----
     check("url: adds https://", normalizeUrl("anilist.co"), "https://anilist.co/");
