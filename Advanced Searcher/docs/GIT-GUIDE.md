@@ -11,8 +11,8 @@ All of this happens in VS Code's **Source Control** panel (Ctrl + Shift + G).
 ## Every time you work
 
 1. **Sync** first (the circular arrows, bottom-left).
-2. Edit **your own file** (see the owner table in README.md).
-3. Type a message saying what changed, e.g. `add AniList fetch`.
+2. Edit **your own file** (see the file table in README.md).
+3. Type a message saying what changed, e.g. `style result cards`.
 4. Click **Commit**, then **Sync**.
 
 ## Letters next to files
@@ -28,6 +28,10 @@ All of this happens in VS Code's **Source Control** panel (Ctrl + Shift + G).
 - **"Pull first" / push rejected:** someone uploaded before you. Click **Sync**.
 - **Merge conflict:** VS Code shows *Accept Current / Accept Incoming / Accept Both*. Choose, save, commit.
 - **Want to undo your edits to a file:** hover it → **Discard Changes**. This cannot be undone.
+
+## Uploading through the GitHub website
+
+Fine for adding a new file. But if you upload a file someone else also changed, your upload silently replaces their version. For existing files, use VS Code: Sync, edit, Commit, Sync.
 
 ## Live Share sessions
 

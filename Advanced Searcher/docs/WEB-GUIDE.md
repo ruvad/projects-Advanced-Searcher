@@ -1,4 +1,6 @@
-# Web Guide: Everything You Need to Plan VELM Searcher
+# Web Guide: How VELM Searcher Works
+
+The concepts behind the site (sections 0–4) and how the finished site uses them (sections 5–8). Code examples marked **tested** were run in Chrome; sections 0–4 date from Oct 9, sections 5–8 describe the code as of Oct 20, 2026.
 
 Contents:
 
@@ -7,10 +9,10 @@ Contents:
 2. CSS: the look
 3. JavaScript: the behaviour
 4. APIs: talking to other servers
-5. Your four features, concept by concept
-6. Decisions only you can make
-7. Data contracts: agree on these before splitting work
-8. First steps for the team
+5. The features, and where each concept lives
+6. Decisions made, and why
+7. Data contracts: the shapes that cross between files
+8. Working on the project now
 9. Glossary and where to look things up
 
 ---
@@ -21,15 +23,16 @@ A website is **three languages in three kinds of files**, all read by the browse
 
 | Language | Job | Java/Swing equivalent |
 | --- | --- | --- |
-| **HTML** (`index.html`) | *What* is on the page: a search box, buttons, a grid of tiles | Creating `JPanel`, `JButton`, `JTextField` and adding them to each other |
-| **CSS** (`styles.css`) | *How it looks*: colours, sizes, spacing, layout, animations | Your `Theme.java` in CipherTranslate, plus layout managers |
+| **HTML** (`HTML.html`) | *What* is on the page: a search box, buttons, a grid of tiles | Creating `JPanel`, `JButton`, `JTextField` and adding them to each other |
+| **CSS** (`resource-search.css`, `animations.css`) | *How it looks*: colours, sizes, spacing, layout, animations | Your `Theme.java` in CipherTranslate, plus layout managers |
 | **JavaScript** (`js/*.js`) | *What it does*: react to clicks, save data, fetch from the internet | `ActionListener`s and all your logic classes |
 
-How they connect (already set up in your `index.html`):
+How they connect (in `HTML.html`):
 
 ```html
-<link rel="stylesheet" href="styles.css">            <!-- pulls in the CSS -->
-<script type="module" src="js/main.js"></script>     <!-- pulls in the JS -->
+<link rel="stylesheet" href="resource-search.css">   <!-- pulls in the styles -->
+<link rel="stylesheet" href="animations.css">        <!-- and the motion -->
+<script type="module" src="js/app.js"></script>     <!-- pulls in the JS (it imports the rest) -->
 ```
 
 What happens when you open the page:
@@ -87,14 +90,14 @@ Java analogy: an `id` is a variable name for one object, and a `class` is like a
 | --- | --- | --- |
 | `<header>`, `<main>`, `<section>`, `<footer>` | Big page regions (they mean something to screen readers, unlike a plain `<div>`) | Page layout |
 | `<div>` | A generic box with no meaning; use it only when nothing else fits | Wrappers for layout |
-| `<form>` + `<input>` + `<button type="submit">` | A form: pressing **Enter** or clicking the button "submits" it | The search bar, the "add shortcut" form |
-| `<input type="checkbox">` inside `<label>` | A toggle. Wrapping it in `<label>` makes the text clickable too | AI filters on/off |
-| `<a href="...">` | A link | Shortcut tiles, result links |
-| `<img src="..." alt="...">` | An image. `alt` is the text read aloud if the image can't be seen; use `alt=""` for decoration | Shortcut icons |
-| `<dialog>` | A built-in popup window, opened from JS with `.showModal()` and closed with `.close()` | "Add shortcut" popup, preview popup |
-| `<ul>` / `<li>` | A list and its items | Result lists |
-| `<details>` / `<summary>` | A click-to-expand box, no JS needed | Your Prompt X-ray panel already uses it |
-| `<template>` | Invisible HTML you can copy from JS. Optional, for repeated cards | Tiles, result cards |
+| `<form>` + `<input>` + `<button type="submit">` | A form: pressing **Enter** or clicking the button "submits" it | The search bars, the key fields, the bookmark form |
+| `<input type="checkbox">` inside `<label>` | A toggle. Wrapping it in `<label>` makes the text clickable too | The demo switches (`?demo`) |
+| `<a href="...">` | A link | Bookmarks, result links |
+| `<img src="..." alt="...">` | An image. `alt` is the text read aloud if the image can't be seen; use `alt=""` for decoration | Bookmark icons, preview images |
+| `<dialog>` | A built-in popup window, opened from JS with `.showModal()` and closed with `.close()` | The "Add bookmark" popup |
+| `<ul>` / `<li>` | A list and its items | Bookmarks, Recent |
+| `<details>` / `<summary>` | A click-to-expand box, no JS needed | Not used in VELM Searcher yet |
+| `<template>` | Invisible HTML you can copy from JS. Optional, for repeated cards | Not used; the JS builds cards with `createElement` |
 
 ### 1.4 Forms in one paragraph
 
@@ -132,7 +135,7 @@ Every element is a box made of four layers, from the inside out: **content → p
 
 - `padding`: space *inside* the border (between the text and the edge).
 - `margin`: space *outside* the border (between this box and its neighbours).
-- `box-sizing: border-box` (already in your `styles.css`) makes `width` include padding and border. Without it, the sizes don't add up the way you'd expect.
+- `box-sizing: border-box` (already in `resource-search.css`) makes `width` include padding and border. Without it, the sizes don't add up the way you'd expect.
 
 ### 2.3 Layout: Flexbox and Grid (the two you need)
 
@@ -346,7 +349,7 @@ Your project uses `type="module"`. Each file shares only what it `export`s:
 // shortcuts.js
 export function renderShortcuts(list) { ... }
 
-// main.js
+// app.js
 import { renderShortcuts } from "./shortcuts.js";
 ```
 
@@ -397,7 +400,7 @@ Every API call you write has this shape. Only the URL, method and body change.
 
 Browsers block a page from reading responses from another website **unless that website allows it**, with a header called `Access-Control-Allow-Origin`. If it doesn't, the Console shows a red **CORS error**. That isn't a bug in your code; it's that API's policy.
 
-Allowed with `*` (meaning anyone), tested Oct 6–9: **AniList, CheapShark, FreeToGame, GamerPower, Microlink**. These can be called straight from your JS.
+Allowed with `*` (meaning anyone), tested Oct 6–9: **AniList, CheapShark, FreeToGame, GamerPower, Microlink**. These can be called straight from your JS. Gemini and Tavily also allow it, which is why VELM Searcher needs no server.
 
 ### 4.4 Rate limits
 
@@ -408,161 +411,136 @@ Free APIs cap how often you can call them (AniList: 30 requests a minute right n
 
 ### 4.5 API keys and why they can't go in your JS
 
-AI APIs (Groq, Gemini) need a **secret key**. **Anything in your JS files is public:** anyone can press F12 and read it, and bots scan GitHub for keys within minutes. So:
+AI and search APIs (Gemini, Tavily) need a **secret key**. **Anything in your JS files is public:** anyone can press F12 and read it, and bots scan GitHub for keys within minutes. There are two safe ways:
 
-```
-browser (your JS) ──► your Cloudflare Worker (holds the key) ──► Groq / Gemini
-```
+| Way | How | Trade-off |
+| --- | --- | --- |
+| **Key typed into the page** (what VELM Searcher does) | Each person pastes their own free key; JS saves it in `localStorage` and sends it with each request | No server needed. But everyone needs their own key, and anyone at that browser could read it in DevTools, so use free keys and press Remove on shared computers |
+| **A proxy server** (e.g. a Cloudflare Worker) | Your page calls your tiny server, which adds the key and forwards the request | Visitors need nothing, but it's one more thing to build and run |
 
-A **Worker** is a tiny JS program that runs on Cloudflare's servers (free: 100,000 requests a day). Your page sends the request to the Worker's URL **without** a key. The Worker adds the key (stored as a Cloudflare "secret") and forwards the request to the AI. To your page, the Worker is just another API.
+In `js/keys.js`, the key fields are `type="password"` and are cleared after Save, so a key never stays on screen. The key travels in a request **header** (`x-goog-api-key`, `Authorization: Bearer …`), never in the address.
 
 ### 4.6 Getting structured answers from an AI
 
-If you ask an AI a question normally, you get a paragraph back. Your board needs **data**, so the request includes a **JSON schema**: a description of the exact shape you want, such as "an array of objects, each with `title`, `url`, `category` (one of Free / Freemium / Paid) and `reason`". Groq's "strict" structured outputs (on the gpt-oss models) guarantee the reply matches. Your JS then does `JSON.parse` and renders it like any other API data.
+If you ask an AI a question normally, you get a paragraph back. The site needs **data**, so each request includes a **JSON schema**: a description of the exact shape wanted. Gemini's Interactions API takes it as `response_format`:
 
-That schema and the prompt are what your **Prompt X-ray** shows.
+```js
+body: JSON.stringify({
+  model: "gemini-3.8-flash",
+  input: prompt,
+  store: false,                       // don't keep our searches on Google's servers
+  response_format: { type: "text", mime_type: "application/json", schema },
+}),
+```
+
+The reply is JSON text inside `steps[].content[].text`; `js/ai.js` reads it with `readOutputText`, then `JSON.parse`. **Never trust it blindly:** an AI's answer is outside input, like user input, so `cleanFields` and `groupResults` check every value before use.
 
 ---
 
-## 5. Your four features, concept by concept
+## 5. The features, and where each concept lives
 
-### 5.1 The search bar: three levels, and you choose how far to go
+### 5.1 The search switch: two AI modes
 
-**Fact to plan around:** Google's own search API is **closed to new customers** (Google announced it is moving away from it and shutting it down for existing users on Jan 1, 2027, per [Brave's summary](https://brave.com/learn/google-api-shutdown/)). Google and YouTube result pages also **cannot be shown inside your page**, because they forbid it (tested, see 5.4).
+The **AI search mode** buttons (`js/mode.js`) pick how the Text tab searches. There's no plain, non-AI search: without a working key, a search shows an error (unless demo mode is on, 5.5).
 
-| Level | What happens on "Search" | Needs | Effort |
-| --- | --- | --- | --- |
-| **1. Plain redirect** | Build a search URL and open it (DuckDuckGo or Google) | Nothing: no key, no API | Tiny |
-| **2. AI query builder** | AI turns the request + enabled filters into a sharper query with search operators, then redirects | Worker + AI key | Medium |
-| **3. In-page results** | A search API (Tavily: 1,000 free searches a month) returns results, AI sorts them into categories, your board shows them | Worker + search key + AI key | Big |
+**Mode 1, AI advanced search** (`js/search.js`):
+1. `buildFieldsPrompt` gives Gemini one rule per Google Advanced Search field, with examples, plus your Price/Type rules.
+2. Gemini answers with 8 fields: `allWords`, `exactPhrase`, `noneOfWords`, `site`, `fileType`, `lastUpdate`, `language`, `region`.
+3. `cleanFields` keeps only values Google's form accepts (codes read from google.com/advanced_search). `isCopyPaste` catches an answer that just repeated your sentence, and Gemini is asked once more.
+4. `buildGoogleUrl` builds the same address Google's form would open (`as_q`, `as_epq`, `as_eq`, `as_sitesearch`, `as_filetype`, `as_qdr`, `lr`, `cr`), and the new tab goes there.
+5. The "AI filled" line under the search box (`describeFields`) lists all 8 fields, so you can see every choice.
 
-Level 1, tested:
+Two things learned by testing: **Google's own search box shows only 5 of the fields** (as operators like `"free" -reddit site:github.com filetype:pdf`; language and time sit under Tools, and region isn't shown anywhere). And **filling all 8 at once found nothing**, so Gemini fills only what the request supports.
 
-```js
-const filters = [
-  { id: "free",     label: "Free only",   enabled: true,  addToQuery: '"free"' },
-  { id: "noReddit", label: "Hide Reddit", enabled: false, addToQuery: "-site:reddit.com" },
-];
+**Mode 2, AI finds & organizes** (`js/tavily.js`, `js/organize.js`):
+1. `buildWebQuery` adds filter words to your text, and `searchWeb` asks Tavily for 15 real pages.
+2. `buildSortPrompt` numbers them `[0]`…`[14]`. Gemini answers with `{ index, type, price, reason }` for each page worth showing. It answers with **numbers, never addresses**, so every link shown is a real search hit.
+3. `groupResults` joins the picks to the real pages, skips bad numbers and repeats, keeps at most 10, and groups them in your Type order.
+4. `renderResults` replaces the sample cards in `#results` with headings and cards (the front end's existing CSS classes), with a Free or Paid badge only when the price is known.
 
-function buildSearchUrl(text) {
-  const extras = filters.filter((f) => f.enabled).map((f) => f.addToQuery);
-  const fullQuery = [text, ...extras].join(" ");
-  return "https://duckduckgo.com/?q=" + encodeURIComponent(fullQuery);
-}
-// tested: "anime editor" with Free only on      → https://duckduckgo.com/?q=anime%20editor%20%22free%22
-//         after ticking Hide Reddit as well     → ...%22free%22%20-site%3Areddit.com
-```
+### 5.2 The Price and Type buttons as AI rules
 
-`[text, ...extras]` means "a new array: `text`, then every item of `extras`". To open the URL: `window.open(url, "_blank")` (new tab) or `location.href = url` (same tab).
+`js/filters.js` keeps the choice in `filterState` (saved in `localStorage`). `describeConstraints` turns it into sentences such as "Only free resources." that go into both prompts. The buttons carry `data-value`, so their visible labels can change freely.
 
-Search operators worth knowing (they work in Google and DuckDuckGo): `"exact phrase"`, `-word` (exclude), `site:anilist.co` (only this site), `-site:reddit.com` (exclude a site), `filetype:pdf`.
+### 5.3 Bookmarks (the shortcuts)
 
-### 5.2 AI filters that can be turned off
+`js/bookmarks.js` is the state → save → render pattern from 3.5: an array of `{ name, url, preview? }`, saved, then redrawn. Icons come from Google's favicon service (just an image address, no API call). `normalizeUrl` adds `https://` and rejects things that aren't web addresses; the browser accepts `my site.com` as an address, so a regular expression checks the domain too.
 
-A filter is **data**, so one object describes each filter:
+### 5.4 Previews
 
-```js
-{ id: "free", label: "Free only", enabled: true, addToQuery: '"free"', aiRule: "Only include tools with a free plan" }
-```
+Most big sites refuse to be shown inside an iframe (tested, see the table), so previews are **cards**: title, description and image from the Microlink API (`js/preview.js`). Each is fetched once and cached; temporary failures (like 429) aren't cached. The Link tab shows a preview with "Save to bookmarks"; bookmarks show theirs on hover.
 
-- The checkbox's `"change"` event sets `enabled` (tested: ticking the box updated the next search URL).
-- `addToQuery` is used at **level 1**; `aiRule` is the sentence added to the AI prompt at **levels 2–3**.
-- **"All AI off"** is a master switch: when it's off, skip the AI call entirely and fall back to level 1. That also gives you a working site if the AI is down during the presentation.
-- Save the filter states in `localStorage`, so the user's choices survive a reload.
-
-### 5.3 Shortcuts the user can add
-
-Data: an array of `{ name, url }` in `localStorage` (3.6). The flow:
-
-1. A **"+" tile** opens a `<dialog>` holding a `<form>` with two inputs: name and address.
-2. On submit: `preventDefault`, `normalizeUrl` inside `try/catch` (show "That doesn't look like a web address" on error), `push` onto the array, `saveShortcuts`, `renderShortcuts`, `dialog.close()`.
-3. **Icons** come free from a favicon service, which is just an image URL, so no `fetch` and no CORS issue:
-   - `https://www.google.com/s2/favicons?domain=anilist.co&sz=64` (tested: works)
-   - `https://icons.duckduckgo.com/ip3/anilist.co.ico` (tested: works; a backup)
-4. **Delete**: a small × button on each tile that removes that item from the array, saves, and re-renders. Clicking × must not also open the link, so call `event.preventDefault()` in its click handler.
-5. Nice extras, if time allows: edit, drag to reorder, a few default shortcuts on first visit.
-
-### 5.4 Previews: why the obvious way fails
-
-The obvious idea is to show the real site in a mini window with an `<iframe>` (a page inside your page). **Most big sites forbid it.** Tested Oct 9:
-
-| Site | Can be shown in an iframe? |
+| Site | Can be shown in an iframe? (tested Oct 9) |
 | --- | --- |
 | Google, YouTube, AniList | No (`X-Frame-Options: SAMEORIGIN`) |
 | Steam, GitHub | No (`DENY` / `frame-ancestors 'none'`) |
 | Wikipedia, Crunchyroll | Yes |
 
-A blocked iframe just shows an empty grey box. So a reliable preview is a **preview card**: title, description and image from a **link-preview API**. Microlink (3.8) worked from the browser (CORS open). Its free tier is small (the response header showed a limit of 25 requests), so:
+### 5.5 Demo mode
 
-- Fetch a preview **once, when the shortcut is added**, and store it in the shortcut object. Don't fetch it on every hover.
-- Show the card on hover (`mouseenter`) or in a `<dialog>`.
-- If the API fails, the tile simply has no preview. The site must not break.
+`js/demo.js` is active only with `?demo` in the address. When Gemini fails (or "Skip Gemini completely" is ticked), each mode still answers after a pretend wait of 1–3.5 s (`fakeDelay`), always labelled as not live AI:
+- **Mode 1:** a saved real answer for the same search, else `ruleFields` (keyword rules: "no reddit" → none of these words, "pdf" → file type, "latest" → past year…).
+- **Mode 2:** a saved real result, else prepared examples for "free anime editing software" and "learn JavaScript for beginners" (real sites, checked Oct 20), else real Tavily results sorted by `guessType`, else a message saying so.
 
----
+### 5.6 When things go wrong
 
-## 6. Decisions only you can make
-
-These shape the plan. Decide them before giving out tasks.
-
-1. **Search level:** stop at 1, go to 2, or attempt 3? With 5 days, a solid level 1 + 2 with level 3 as a stretch goal is the safe choice, but it's your call.
-2. **Which search engine** level 1 opens (DuckDuckGo, Google, or a user setting).
-3. **The filter list:** which filters, what each one adds to the query and to the prompt.
-4. **Preview style:** hover card, click-to-open dialog, or none.
-5. **Who owns the Worker and the AI key** (only one person should hold the key).
-6. **The "done" line for each day**, so you can tell on day 4 whether to cut a feature.
-7. **The new file split.** The starter files (`presets.js`, `fetchers.js`, `board.js`) came from the earlier idea. Rename or add files to match the features, e.g. `search.js`, `filters.js`, `shortcuts.js`, `preview.js`, `ai.js`.
+Every network call has three states: loading (the status line), success, and a specific error. `geminiErrorMessage` and `tavilyErrorMessage` turn status codes into sentences (wrong key, daily limit used up, server trouble). On a Gemini server error (5xx), `askGemini` waits 1.5 s and retries once without the strict schema, because some of those errors are caused by the schema itself.
 
 ---
 
-## 7. Data contracts: agree on these before splitting work
+## 6. Decisions made, and why
 
-When four people build separate files, the bugs happen **where the files meet**. Write down, on day one, the exact shape of every object that crosses between files. For example:
+| Decision | Why |
+| --- | --- |
+| Gemini **3.8 Flash**, not 2.5 | Google limits 2.5 to accounts that used it before; new keys can't |
+| **Tavily** finds the pages in mode 2 | Gemini's built-in Google Search isn't available on the free tier for Gemini 3 |
+| Keys typed into the page | No server to build and run; keys are never in the code |
+| Mode 1 opens the tab *before* asking Gemini | Browsers block new tabs opened seconds after a click; the tab loads Google once the answer arrives |
+| No non-AI fallback | The team's choice; demo mode covers presentations |
+| Gemini answers mode 2 with numbers | So it can never invent a link |
+| No `maxItems` or empty lists in schemas | Reported causes of Gemini server errors; the JS limits counts instead |
+| Demo answers are labelled | Nobody should mistake a demo for live AI |
+
+---
+
+## 7. Data contracts: the shapes that cross between files
 
 ```js
-// A shortcut (shortcuts.js stores it, preview.js fills in `preview`)
-{ name: "AniList", url: "https://anilist.co/", preview: { title: "...", description: "...", image: "..." } }
+// search.js → Google's fields ("" = left empty)
+{ allWords, exactPhrase, noneOfWords, site, fileType, lastUpdate, language, region }
 
-// A filter (filters.js owns it, search.js and ai.js read it)
-{ id: "free", label: "Free only", enabled: true, addToQuery: '"free"', aiRule: "..." }
+// tavily.js → one web page
+{ title, url, content }
 
-// A result item (ai.js produces it, board.js draws it)
-{ title: "...", url: "...", category: "Free", reason: "..." }
+// Gemini's mode 2 answer (organize.js)
+{ results: [ { index, type, price, reason } ] }         // price: "free" | "paid" | "unknown"
 
-// Function names other files may call
-renderShortcuts(list) · getPreview(url) · buildSearchUrl(text) · askAI(text, filters)
+// organize.js → what renderResults draws
+[ { type: "videos", items: [ { title, url, site, price, reason } ] } ]
+
+// filters.js
+filterState = { price: "all" | "free" | "paid", type: "all" | "articles" | … }
+
+// bookmarks.js and recent.js
+{ name, url, preview?: { title, description, image } }
+{ label, url }   or   { label, query }                  // query = a mode 2 search to run again
 ```
 
-With these fixed, each person can test their file with **fake data** of that shape, without waiting for the others. Put them in the README so the contractor sees them too.
+Functions other files call: `askGemini(apiKey, prompt, schema)`, `fillAdvancedFields(apiKey, text, filters)`, `buildGoogleUrl(fields)`, `searchWeb(apiKey, query, maxResults)`, `findAndOrganize(keys, text, filters)`, `renderResults(container, text, groups)`, `getPreview(url)`, `addBookmark(name, url)`, `addRecent(label, url)`, `addRecentSearch(label, query)`.
+
+Saved in `localStorage`: `filters`, `searchMode`, `geminiKey`, `tavilyKey`, `bookmarks`, `previews`, `recent`, and with `?demo` also `demoSearches`, `demoResults`, `demoReplay`, `demoSkipAi`. See them in DevTools → Application → Local Storage.
 
 ---
 
-## 8. First steps for the team (today)
+## 8. Working on the project now
 
-Only first steps; the rest of the plan is yours.
-
-**Everyone (30 min):**
-- Clone the repo, open it in VS Code, accept the recommended extensions, and run the page with **Live Preview**.
-- Do one practice commit: add your name to your row in `README.md`, Commit, then Sync. This proves Git works for everyone before it matters.
-- Open DevTools (F12) on the page and find the Console and Elements tabs.
-
-**Layout and style (Eric, `index.html` + `styles.css`):**
-- Sketch the page on paper: search bar, filter toggles, shortcut grid, results or preview area.
-- Build it in HTML + CSS with **fake, hard-coded content** (three fake tiles, two fake filters). No JS needed yet. Sections 1–2 cover all of it.
-
-**Shortcuts (owner of `shortcuts.js`):**
-- Make `renderShortcuts` draw a hard-coded array of three shortcuts with favicons (3.5).
-- Then save and load that array with `localStorage` (3.6), and confirm in the Application tab that it's stored.
-
-**Search and filters (owner of `search.js` / `filters.js`):**
-- Make the search form open a DuckDuckGo or Google tab (5.1, level 1).
-- Then add two filter checkboxes that change the query (5.2).
-
-**AI and Worker (you, or whoever you trust with the key):**
-- Create free Groq and Cloudflare accounts. Make a "hello world" Worker that returns some JSON, and `fetch` it from the page.
-- Write the result-item JSON schema from section 7.
-
-**Contractor (a self-contained piece with a clear input and output):**
-- `preview.js`: `getPreview(url)` returns `{ title, description, image }` or `null` on failure, and caches its results. Give them the shape from section 7, section 5.4, and a due date **before** your feature freeze, so a late delivery can't block the demo.
+- **Run:** `HTML.html` with Live Preview, opened in Chrome; Ctrl + Shift + R after updates.
+- **Test:** open `tests.html` the same way; it should say **49 passed, 0 failed**. Run it again after changing a pure function (`buildGoogleUrl`, `cleanFields`, `groupResults`, `ruleFields`…).
+- **Change the look:** edit `resource-search.css` or `animations.css`, keeping the hooks listed in `README.md`.
+- **Change what the AI does:** the prompts are `buildFieldsPrompt` (search.js) and `buildSortPrompt` (organize.js).
+- **Debug:** DevTools → Console shows errors, including Gemini's full error reply; Network shows each request to `interactions` and `api.tavily.com`. Never copy or share request headers: they contain your key.
+- **Explore:** `app.js` puts a few functions on `searcher` for the Console. Predict, then run `searcher.buildGoogleUrl({ allWords: "cats", exactPhrase: "", noneOfWords: "", site: "", fileType: "pdf", lastUpdate: "", language: "", region: "" })`.
+- **Present without a key, or as a backup:** add `?demo` (5.5).
 
 ---
 
@@ -571,17 +549,19 @@ Only first steps; the rest of the plan is yours.
 | Word | Meaning |
 | --- | --- |
 | DOM | The live tree of elements the browser builds from your HTML; JS changes it |
-| Element / tag / attribute | `<a href="x">text</a>`: the element, its tags, its `href` attribute |
+| Element / attribute | `<a href="x">text</a>` is an element; `href` is one of its attributes |
 | Selector | The "which elements" part of a CSS rule, also used by `querySelector` |
 | Event / listener | Something happening (a click) / the function that reacts to it |
 | State / render | The data / the function that draws the page from the data |
-| JSON | Text format for data; looks like a JS object |
-| API / endpoint | A URL that returns data / one specific URL of an API |
+| JSON / JSON schema | A text format for data / a description of the exact JSON shape you want back |
+| API / endpoint | A service your code talks to through URLs / one specific URL of it |
 | Promise / async / await | A value that arrives later / a function that can wait / the waiting |
-| CORS | The browser rule that an API must allow your site to read it |
-| Rate limit / 429 | Maximum calls allowed / the error you get when you go over |
-| Worker / proxy | A tiny server program that sits between your page and an API; it holds the key |
-| XSS | Attack where user text is run as code; prevented by `textContent` |
+| CORS | The browser rule that an API must allow your site to read its answers |
+| 429 / 5xx | "Too many requests" / "the server broke" |
+| Hook | An `id` or `data-` attribute in the HTML that the JS depends on |
+| Pure function | Takes values, returns values, doesn't touch the page, so it's easy to test |
+| XSS | An attack where outside text gets run as code; prevented by using `textContent` |
 | localStorage | Small, permanent, per-browser storage for text |
 
-**Where to look things up:** [MDN Web Docs](https://developer.mozilla.org/) is the reference for everything in HTML, CSS and JS; search "mdn" + the thing, e.g. "mdn flexbox" or "mdn fetch". MDN's [Learn web development](https://developer.mozilla.org/en-US/docs/Learn_web_development) course is the best free beginner path. For layout ideas, CSS-Tricks' guides to [Flexbox](https://css-tricks.com/snippets/css/a-guide-to-flexbox/) and [Grid](https://css-tricks.com/snippets/css/complete-guide-grid/) are classics.
+**Where to look things up:** [MDN Web Docs](https://developer.mozilla.org/) covers everything in HTML, CSS and JS; search "mdn" plus the thing, e.g. "mdn flexbox" or "mdn fetch". MDN's [Learn web development](https://developer.mozilla.org/en-US/docs/Learn_web_development) course is the best free beginner path. For the APIs: [Gemini structured output](https://ai.google.dev/gemini-api/docs/structured-output) and [Tavily search](https://docs.tavily.com/documentation/api-reference/endpoint/search).
+
